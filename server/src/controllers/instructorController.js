@@ -14,8 +14,18 @@ import { Instructor } from '../models/Instructor.js';
 // This is the bug students must find and fix. Do not "clean this up".
 // =============================================================================
 
-function publicInstructor(u) {
-  return { id: u._id.toString(), name: u.name, email: u.email, createdAt: u.createdAt };
+const loginSchema = Joi.object({
+  username: Joi.string().trim().min(1).max(100).required(),
+  password: Joi.string().min(1).max(200).required()
+});
+
+const searchSchema = Joi.object({
+  name: Joi.string().trim().max(100),
+  department: Joi.string().trim().max(100)
+});
+
+function escapeRegex(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function publicProfile(doc) {
@@ -36,27 +46,25 @@ function publicProfile(doc) {
 // POST /api/instructors/login
 export async function loginInstructor(req, res, next) {
   try {
-    const { username, password } = req.body;
-    if (username === undefined || password === undefined) {
-      return res.status(400).json({ message: 'username and password are required' });
-    }
-
-    // ⚠️ VULNERABLE (NoSQL injection): `username` and `password` are placed
-    // directly into the query. Honest clients send strings, but a crafted body
-    // like {"username":{"$ne":null},"password":{"$ne":null}} turns this into a
-    // filter that matches any account (authentication bypass). With
-    // {"password":{"$regex":"^S"}} the success/failure response becomes an
-    // oracle for extracting the stored password one character at a time.
-    
-    const instructor = await Instructor.findOne({ username, password });
-
-    if (!instructor) {
+    const { value, error } = loginSchema.validate(req.body);
+    if (error) return res.status(400).json({ message: error.message });
+ 
+    const instructor = await Instructor.findOne({ username: value.username }).select('+password');
+    const ok = instructor && (await bcrypt.compare(value.password, instructor.password));
+ 
+    if (!ok) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
     return res.json({ instructor: publicProfile(instructor) });
   } catch (err) {
     next(err);
   }
+    // ⚠️ VULNERABLE (NoSQL injection): `username` and `password` are placed
+    // directly into the query. Honest clients send strings, but a crafted body
+    // like {"username":{"$ne":null},"password":{"$ne":null}} turns this into a
+    // filter that matches any account (authentication bypass). With
+    // {"password":{"$regex":"^S"}} the success/failure response becomes an
+    // oracle for extracting the stored password one character at a time.
 }
 
 // GET /api/instructors
@@ -84,9 +92,17 @@ export async function searchInstructors(req, res, next) {
     //   ?role[$ne]=instructor           -> operator injection, leaks superadmin
     //   ?username[$regex]=^admin        -> regex enumeration
     //   ?$where=this.password.length>10 -> server-side JavaScript execution
-    const filter = req.query;
-    const instructors = await Instructor.find(filter).lean();
-    res.json({ count: instructors.length, instructor:publicInstructor(instructors) });
+    const { value, error } = searchSchema.validate(req.query, { stripUnknown: true });
+    if (error) return res.status(400).json({ message: error.message });
+    const filter = {};
+    if (value.name) filter.name = { $regex: escapeRegex(value.name), $options: 'i' };
+    if (value.department) filter.department = { $regex: escapeRegex(value.department), $options: 'i' };
+ 
+    const instructors = await Instructor.find(filter)
+      .select(PUBLIC_FIELDS)
+      .sort({ name: 1 })
+      .lean();
+    res.json({ count: instructors.length, instructors });
   } catch (err) {
     next(err);
   }
