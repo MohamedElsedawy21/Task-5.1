@@ -14,6 +14,10 @@ import { Instructor } from '../models/Instructor.js';
 // This is the bug students must find and fix. Do not "clean this up".
 // =============================================================================
 
+function publicInstructor(u) {
+  return { id: u._id.toString(), name: u.name, email: u.email, createdAt: u.createdAt };
+}
+
 function publicProfile(doc) {
   // A successful login is a "trophy": we deliberately return the sensitive
   // fields so a bypass clearly reveals what it compromised.
