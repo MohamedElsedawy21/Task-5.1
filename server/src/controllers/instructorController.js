@@ -86,7 +86,7 @@ export async function searchInstructors(req, res, next) {
     //   ?$where=this.password.length>10 -> server-side JavaScript execution
     const filter = req.query;
     const instructors = await Instructor.find(filter).lean();
-    res.json({ count: instructors.length, instructors });
+    res.json({ count: instructors.length, instructor:publicInstructor(instructors) });
   } catch (err) {
     next(err);
   }

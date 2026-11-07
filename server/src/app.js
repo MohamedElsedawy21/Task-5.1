@@ -5,7 +5,7 @@ import authRoutes from './routes/auth.js';
 import reviewRoutes from './routes/reviews.js';
 import userRoutes from './routes/users.js';
 import instructorRoutes from './routes/instructors.js';
-
+const mongoSanitize=require('express-mongo-sanitize');
 const app = express();
 
 app.use(morgan('dev'));
