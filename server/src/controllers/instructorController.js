@@ -15,6 +15,8 @@ import bcrypt from 'bcryptjs';
 // This is the bug students must find and fix. Do not "clean this up".
 // =============================================================================
 
+const PUBLIC_FIELDS = 'name department role';
+
 const loginSchema = Joi.object({
   username: Joi.string().trim().min(1).max(100).required(),
   password: Joi.string().min(1).max(200).required()
